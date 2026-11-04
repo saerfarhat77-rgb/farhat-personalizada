@@ -99,6 +99,7 @@ function tubo3(pts3,raio,fechado){ return new THREE.TubeGeometry(new THREE.Catmu
 /* onde ficam as garras, em unidade da caixa da pedra */
 function alvosGarra(forma,crav){
   if(crav==='duas') return [[0,.5],[0,-.5]];
+  if(crav==='cartier') return [[.5,.26],[.5,-.26],[-.5,.26],[-.5,-.26]];   /* duas a duas, viradas para a pedra vizinha */
   if(crav==='compartilhada') return [[.5,.27],[.5,-.27],[-.5,.27],[-.5,-.27]];
   if(crav==='seis') return [0,60,120,180,240,300].map(a=>[Math.cos(a*Math.PI/180)*.5,Math.sin(a*Math.PI/180)*.5]);
   if(forma==='gota') return [[.5,0],[-.32,.46],[-.32,-.46],[-.5,0]];
@@ -121,6 +122,18 @@ function cabeca(forma,d,c,crav){
     const pular=crav==='semi-bezel'?(p=>Math.abs(p[0])>d.L*.24):null;
     partes.push(casca(pts,perfil,pular));
     if(crav==='semi-bezel'||!fechada) partes.push(trilho(pts,.74,fundoY*.72,rRail));
+  } else if(crav==='coroa'){
+    /* coroa: colar de metal arredondado em volta da pedra, que sobe em quatro pontas e desce entre elas */
+    const fino=[]; pts.forEach((p,i)=>{ const q=pts[(i+1)%pts.length]; for(let k=0;k<4;k++) fino.push([p[0]+(q[0]-p[0])*k/4,p[1]+(q[1]-p[1])*k/4]); });
+    const nr=normais(fino), rim=Math.min(.72,Math.max(.3,.115*W)), garras=alvosGarra(forma,crav).map(([ax,az])=>{ const qx=ax*d.L, qz=az*d.W; let m=1e9, b=pts[0]; for(const q of pts){ const e=Math.hypot(q[0]-qx,q[1]-qz); if(e<m){ m=e; b=q; } } return b; });
+    const angs=garras.map(([x,z])=>Math.atan2(z,x)), N=fino.length, pos=[], idx=[];
+    const perfil=fechada?[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.55,.6,-.8],[.3,.05,-1]]:[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.6,.55,-.78],[.58,.1,-.8]];
+    fino.forEach(([x,z],i)=>{ const a=Math.atan2(z,x); let u=0; for(const b of angs){ let e=Math.abs(a-b); if(e>Math.PI) e=2*Math.PI-e; u=Math.max(u,Math.exp(-((e/.4)**2))); }
+      const topo=-d.pav*.2+(d.coroa*.26+d.pav*.2)*u;
+      perfil.forEach(([f,o,yr],j)=>{ const of=j===0?o:o*rim, y=j<3?topo+yr*W*.4:Math.min(topo-.1*W,d.pav*yr); pos.push(x*f+nr[i][0]*of,y,z*f+nr[i][1]*of); }); });
+    const M=perfil.length; for(let i=0;i<N;i++){ const k=(i+1)%N; for(let j=0;j<M-1;j++){ const a=i*M+j, b=k*M+j, c2=k*M+j+1, e=i*M+j+1; idx.push(a,b,e,b,c2,e); } }
+    const gc=new THREE.BufferGeometry(); gc.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); gc.setIndex(idx); gc.computeVertexNormals(); partes.push(gc);
+    for(const [px,pz] of garras){ const r=Math.hypot(px,pz)||1, ux=px/r, uz=pz/r; partes.push(bolaEm(V(px+ux*rim*.08,d.coroa*.44,pz+uz*rim*.08),haste*1.3)); }
   } else if(crav==='canaleta'){
     partes.push(trilho(pts,.72,fundoY*.72,rRail));
   } else {

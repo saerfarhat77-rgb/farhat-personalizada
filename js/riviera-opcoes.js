@@ -7,7 +7,7 @@ new ResizeObserver(alturaTopo).observe(topo); alturaTopo();
 const num=(x,c=2)=>x.toFixed(c).replace('.',',');
 const mm=x=>x.toLocaleString('pt-BR',{maximumFractionDigits:1,minimumFractionDigits:1});
 const op=(lista)=>lista.map(([v,t,s])=>({v,t,s}));
-const PRONGS=['quatro','seis','duas','compartilhada'];
+const PRONGS=['cartier','coroa','quatro','seis','duas','compartilhada'];
 const PESOS=[0.03,0.05,0.07,0.10,0.15,0.20,0.25,0.30,0.40,0.50,0.70,1.00,1.50,2.00];
 const pesoOp=PESOS.map(p=>({v:p.toFixed(2),t:num(p)+' ct',p}));
 const FORMA_OP=Object.entries(R.FORMAS).map(([v,f])=>({v,t:f.t}));
@@ -65,9 +65,9 @@ const G={
     {v:'zigue-zague',t:'Zigue-zague',s:'uma para cada lado',i:POS_IC['zigue-zague']}],
     nao:(v,c)=>(['compartilhada','canaleta'].includes(c.cravacao)&&['diagonal','zigue-zague'].includes(v))||(R.FORMAS[c.forma].quadrada&&v==='atravessada')},
 
-  cravacao:{t:'Cravação',o:op([['quatro','4 garras'],['seis','6 garras'],['duas','2 garras','nas laterais'],['compartilhada','Garra compartilhada','pedras mais juntas'],['bezel','Bezel','aro de ouro em volta'],['semi-bezel','Semi-bezel','aro nos dois lados'],['canaleta','Canaleta','entre dois trilhos']]),
+  cravacao:{t:'Cravação',o:op([['cartier','Garra Cartier','4 garras mais juntas'],['coroa','Garra coroa','mais metal, pedras mais afastadas'],['quatro','4 garras'],['seis','6 garras'],['duas','2 garras','nas laterais'],['compartilhada','Garra compartilhada','pedras mais juntas'],['bezel','Bezel','aro de ouro em volta'],['semi-bezel','Semi-bezel','aro nos dois lados'],['canaleta','Canaleta','entre dois trilhos']]),
     nao:(v,c)=>(v==='seis'&&!['redondo','oval','almofada'].includes(c.forma))||(['compartilhada','canaleta'].includes(v)&&(c.espaco==='estacoes'||['diagonal','zigue-zague'].includes(c.posicao)))||(v==='canaleta'&&['gota','marquise','coracao'].includes(c.forma))},
-  ponta:{t:'Ponta da garra',mostrar:c=>PRONGS.includes(c.cravacao),o:op([['redonda','Redonda'],['unha-gato','Unha de gato'],['quadrada','Quadrada'],['em-v','Em V']])},
+  ponta:{t:'Ponta da garra',mostrar:c=>PRONGS.includes(c.cravacao)&&c.cravacao!=='coroa',o:op([['redonda','Redonda'],['unha-gato','Unha de gato'],['quadrada','Quadrada'],['em-v','Em V']])},
   espessuraGarra:{t:'Espessura da garra',mostrar:c=>PRONGS.includes(c.cravacao),o:op([['fina','Fina'],['media','Média'],['robusta','Robusta']])},
   base:{t:'Base da pedra',o:op([['aberta','Aberta','entra luz por baixo'],['fechada','Fechada','fundo de ouro']])},
   altura:{t:'Altura da cravação',o:op([['baixa','Baixa'],['media','Média'],['alta','Alta']])},
@@ -93,7 +93,7 @@ const SECOES=[
 ];
 const PADRAO={peca:'colar',medidaColar:'42',medidaPulseira:'17',aro:'14',curva:'redonda',estrutura:'articulada',
   forma:'redondo',ct:'0.10',posicao:'na-linha',composicao:'uniforme',gradFim:'media',centralCt:'1.00',centralForma:'igual',segunda:'baguete',
-  extensao:'inteira',espaco:'justo',fileiras:'1',cravacao:'quatro',ponta:'redonda',espessuraGarra:'media',base:'aberta',altura:'media',
+  extensao:'inteira',espaco:'justo',fileiras:'1',cravacao:'cartier',ponta:'redonda',espessuraGarra:'media',base:'aberta',altura:'media',
   pingente:'sem',pingenteCt:'1.00',ouro:'branco',ouroCrav:'igual',acabamento:'polido',corrente:'elo',fecho:'gaveta',extensor:'0',gravacao:''};
 const cfg={...PADRAO};
 const q=new URLSearchParams(location.search);
@@ -150,7 +150,7 @@ function resumo(M=calcular()){
   if(cfg.composicao==='intercalada') P.push(`intercalada com ${rotulo('segunda',cfg.segunda).toLowerCase()}`);
   P.push(`${rotulo('extensao',cfg.extensao).toLowerCase()}, espaço ${rotulo('espaco',cfg.espaco).toLowerCase()}`);
   if(M.fileiras>1) P.push(`${M.fileiras} fileiras`);
-  const prong=PRONGS.includes(cfg.cravacao);
+  const prong=PRONGS.includes(cfg.cravacao)&&cfg.cravacao!=='coroa';
   P.push(`cravação ${rotulo('cravacao',cfg.cravacao).toLowerCase()}`+(prong?` com ponta ${rotulo('ponta',cfg.ponta).toLowerCase()}`:'')+`, base ${rotulo('base',cfg.base).toLowerCase()}`);
   if(cfg.peca==='colar'){ P.push(`caimento ${rotulo('curva',cfg.curva).toLowerCase()}`); if(cfg.pingente!=='sem') P.push(`pingente ${rotulo('pingente',cfg.pingente).toLowerCase()} de ${valorPeso(+cfg.pingenteCt)}`); }
   if(cfg.peca!=='anel'){ P.push(`estrutura ${rotulo('estrutura',cfg.estrutura).toLowerCase()}, fecho ${rotulo('fecho',cfg.fecho).toLowerCase()}`); if(cfg.extensor!=='0') P.push(`extensor de ${cfg.extensor} cm`); if(G.corrente.mostrar(cfg)) P.push(`corrente ${rotulo('corrente',cfg.corrente).toLowerCase()}`); }

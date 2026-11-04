@@ -66,7 +66,7 @@ function caminho(c,alturaAnel=0){
 }
 
 const EXTENSAO={inteira:1,'tres-quartos':0.75,metade:0.5,terco:0.34};
-const FOLGA_CRAV={quatro:0.35,seis:0.35,duas:0.22,compartilhada:0.12,bezel:0.75,'semi-bezel':0.5,canaleta:0.04};
+const FOLGA_CRAV={cartier:0.18,quatro:0.35,seis:0.35,duas:0.22,compartilhada:0.12,bezel:0.75,'semi-bezel':0.5,canaleta:0.04};
 const FOLGA_ESPACO={justo:0,leve:0.6,aberto:1.8};
 const FIM_GRAD={suave:0.6,media:0.35,forte:0.18};
 const rad=g=>g*Math.PI/180;
@@ -94,7 +94,8 @@ function montar(c){
   const cam=caminho(c,alturaAnel), P=cam.P, fechoMeio=c.peca==='anel'?0:(c.fecho==='invisivel'?2.5:c.fecho==='lagosta'?5:7);
   const limite=(EXTENSAO[c.extensao]||1)*P/2-((c.extensao==='inteira')?fechoMeio:0);
   const estacoes=c.espaco==='estacoes';
-  const folga=(FOLGA_CRAV[c.cravacao]??0.35)+(FOLGA_ESPACO[c.espaco]??0);
+  /* a coroa tem metal em volta da pedra: afasta as pedras em proporcao ao tamanho, e cabem menos */
+  const folga=(c.cravacao==='coroa'?Math.max(0.75,0.2*Math.min(dMax.L,dMax.W)):(FOLGA_CRAV[c.cravacao]??0.35))+(FOLGA_ESPACO[c.espaco]??0);
   const passoEstacao=c.peca==='anel'?3:c.peca==='pulseira'?10:18;
 
   const pedra=(i,s,lado)=>{
