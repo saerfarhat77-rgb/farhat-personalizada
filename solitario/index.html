@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Solitário sob medida | Farhat</title>
+<meta name="description" content="Monte o seu solitário de diamante natural e ouro 18k e veja cada escolha em 3D.">
+<link rel="preload" href="../assets/fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="../assets/marca/favicon.png">
+<link rel="stylesheet" href="../assets/site.css">
+<style>
+.topo .marca img{height:26px;filter:none}
+.rodape img{height:30px;filter:none}
+.caminhos a{padding:0 0 14px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-stretch:110%;color:var(--cinza);border-bottom:1px solid transparent;margin-bottom:-1px;text-decoration:none;transition:color .2s}
+.caminhos a:hover{color:var(--preto)}
+.caminhos a[aria-current="page"]{color:var(--preto);border-bottom-color:var(--preto)}
+.pedido-acoes{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}
+.pedido-acoes button{text-decoration:underline;text-underline-offset:.25em;text-decoration-thickness:1px;color:var(--texto-2)}
+.pedido-acoes button:hover{color:var(--preto)}
+.aviso-pedido{font-size:13px;color:var(--preto);min-height:1.2em;white-space:pre-line}
+.rodape{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;font-size:13px;color:var(--texto-2)}
+.ficha{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:10px;padding:12px 0 0;font-size:11px;letter-spacing:.08em;color:var(--cinza)}
+.ficha b{display:block;font-weight:400;font-size:17px;letter-spacing:0;color:var(--preto);line-height:1.2;white-space:nowrap}
+.riviera .montar{grid-template-columns:minmax(0,1fr) minmax(320px,470px)}
+.riviera .palco{height:620px}
+.peso-ic{max-width:100%}
+.escolhas.pedra{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));align-items:end}
+.escolhas.pedra button{align-content:end}
+@media (max-width:900px){
+  .riviera .montar{grid-template-columns:minmax(0,1fr)}
+  .riviera .palco{height:210px}
+  .ficha{padding:10px var(--g) 10px;background:var(--fundo);border-bottom:1px solid var(--linha)}
+  .ficha b{font-size:14px}
+  .ficha span{font-size:10px}
+}
+</style>
+</head>
+<body class="solitario">
+<header class="topo"><div class="topo-in"><a class="marca" href="../index.html"><img src="../assets/marca/farhat.png" alt="Farhat" width="818" height="143"></a></div></header>
+<main class="pz">
+  <div class="pz-topo">
+    <h1>A joia que você imaginou.</h1>
+    <p>Monte a sua peça e veja cada escolha na hora. Nossa equipe responde com o orçamento e cuida de todos os detalhes.</p>
+    <nav class="caminhos" aria-label="Tipo de joia"><a href="../solitario/index.html" aria-current="page">Solitário</a><a href="../riviera/index.html">Riviera</a></nav>
+  </div>
+  <div class="pz-corpo">
+    <div class="montar">
+      <div class="montar-principal">
+        <div class="opcoes" id="opcoes"></div>
+        <div class="finalizar"><div class="resumo-pz"><b>Seu anel</b><p id="resumo"></p></div></div>
+      </div>
+      <aside class="previa-lado" aria-label="Prévia">
+        <div class="palco" id="palco">
+          <div class="carregando-3d" id="carregando-3d">Preparando a prévia…</div>
+          <span class="dica-giro" id="dica-giro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Arraste para girar</span>
+        </div>
+        
+        <p class="previa-nota">Prévia ilustrativa. A equipe confere cada detalhe com você.</p>
+      </aside>
+    </div>
+    <div class="seus-dados">
+        <div><h2>Pedir orçamento</h2><p>Mandamos o resumo completo da peça e o link para a nossa equipe, que responde com o orçamento e tira as dúvidas.</p></div>
+        <div class="campos">
+          <label>Seu nome<input id="nome" autocomplete="name"></label>
+          <label>Alguma observação <small>(opcional)</small><textarea id="obs" placeholder="Ex.: é para um presente em dezembro."></textarea></label>
+          <button type="button" class="enviar" id="pedir"><span>Enviar pedido</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+          <div class="pedido-acoes"><button type="button" id="salvar">Salvar imagem da peça</button><button type="button" id="copiar">Copiar link desta peça</button></div>
+          <p class="aviso-pedido" id="pedido-aviso" role="status"></p>
+        </div>
+      </div>
+  </div>
+</main>
+<footer class="rodape"><div><img src="../assets/marca/farhat.png" alt="Farhat" width="818" height="143"><p>Joias sob medida em ouro 18k e diamante natural.</p></div><div><p id="rodape-contato"></p></div></footer>
+<script src="../js/marca.js"></script>
+<script src="../js/solitario-opcoes.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module" src="../js/solitario-3d.js"></script>
+<script>montarPedido("solitario",window.PZ)</script>
+</body>
+</html>
