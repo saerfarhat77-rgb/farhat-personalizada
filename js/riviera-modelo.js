@@ -15,9 +15,34 @@ const FORMAS={
   marquise:{t:'Marquise',dim:[10,5],corte:'brilhante',gira:true},
   coracao:{t:'Coração',dim:[6.4,6.6],corte:'brilhante',gira:true,seta:true},
 };
+/* redondo: diametro e peso seguem a tabela tecnica; fora dela, a raiz cubica */
+const T=window.RivieraTabela, DIAM=T.diam.map(l=>[l[0],l[2]===undefined?l[1]:(l[1]+l[2])/2]);
+function mmDoPeso(ct){
+  if(ct>=DIAM[DIAM.length-1][1]) return 6.5*Math.cbrt(ct);
+  if(ct<=DIAM[0][1]) return DIAM[0][0]*Math.cbrt(ct/DIAM[0][1]);
+  const i=DIAM.findIndex(l=>l[1]>=ct), a=DIAM[i-1], b=DIAM[i];
+  return a[0]+(b[0]-a[0])*(ct-a[1])/(b[1]-a[1]);
+}
+function pesoDoMm(mm){
+  if(mm>=DIAM[DIAM.length-1][0]) return (mm/6.5)**3;
+  if(mm<=DIAM[0][0]) return DIAM[0][1]*(mm/DIAM[0][0])**3;
+  const i=DIAM.findIndex(l=>l[0]>=mm), a=DIAM[i-1], b=DIAM[i];
+  return a[1]+(b[1]-a[1])*(mm-a[0])/(b[0]-a[0]);
+}
+/* linha da tabela para o modelo: a do diametro mais proximo. "dentro" = o modelo e feito nesse tamanho */
+function linhaTabela(modelo,mm){
+  const l=T.modelos[modelo]; if(!l) return null;
+  const r=l.reduce((a,b)=>Math.abs(b.mm-mm)<Math.abs(a.mm-mm)?b:a,l[0]);
+  return {...r,dentro:Math.abs(r.mm-mm)<=0.25,folga:10/r.pedrasPorCm-r.mm};
+}
+const PESOS=[0.03,0.05,0.07,0.10,0.15,0.20,0.25,0.30,0.40,0.50,0.70,1.00,1.50,2.00];
+function tamanhosDe(modelo,forma){
+  const l=forma==='redondo'&&T.modelos[modelo];
+  return l?l.map(r=>({ct:pesoDoMm(r.mm),mm:r.mm})):PESOS.map(ct=>({ct,mm:mmDoPeso(ct)}));
+}
 function medidas(forma,ct){
-  const k=Math.cbrt(ct), [L,W]=FORMAS[forma].dim, base=Math.min(L,W)*k;
-  return {L:L*k,W:W*k,pav:(FORMAS[forma].corte==='degrau'?0.38:0.43)*base,coroa:0.16*base};
+  const k=Math.cbrt(ct), red=forma==='redondo', mm=red?mmDoPeso(ct):0, [L,W]=red?[mm,mm]:FORMAS[forma].dim.map(v=>v*k), base=Math.min(L,W);
+  return {L,W,pav:(FORMAS[forma].corte==='degrau'?0.38:0.43)*base,coroa:0.16*base};
 }
 
 /* contorno da pedra em unidade (caixa de -0,5 a 0,5). x = comprimento; a ponta da gota e do coracao fica em +x */
@@ -94,39 +119,50 @@ function montar(c){
   const cam=caminho(c,alturaAnel), P=cam.P, fechoMeio=c.peca==='anel'?0:(c.fecho==='invisivel'?2.5:c.fecho==='lagosta'?5:7);
   const limite=(EXTENSAO[c.extensao]||1)*P/2-((c.extensao==='inteira')?fechoMeio:0);
   const estacoes=c.espaco==='estacoes';
-  /* a coroa tem metal em volta da pedra: afasta as pedras em proporcao ao tamanho, e cabem menos */
-  const folga=(c.cravacao==='coroa'?Math.max(0.75,0.2*Math.min(dMax.L,dMax.W)):(FOLGA_CRAV[c.cravacao]??0.35))+(FOLGA_ESPACO[c.espaco]??0);
+  /* nos modelos da tabela o espaco entre as pedras vem da tabela: e o metal de cada modelo que decide quantas cabem */
+  const linha=linhaTabela(c.cravacao,Math.min(dMax.L,dMax.W));
+  const folga=(linha?linha.folga:(FOLGA_CRAV[c.cravacao]??0.35))+(FOLGA_ESPACO[c.espaco]??0);
   const passoEstacao=c.peca==='anel'?3:c.peca==='pulseira'?10:18;
 
-  const pedra=(i,s,lado)=>{
+  const lista=tamanhosDe(c.cravacao,formaP), fimCt=+c.ctFim>0?+c.ctFim:principal*(FIM_GRAD[c.gradFim]||0.35);
+  const pedra=(i,s,lado,ctFixo)=>{
     let forma=formaP, ct=principal;
-    if(c.composicao==='graduada'){ const u=Math.min(1,Math.abs(s)/Math.max(1,limite)); ct=principal*(1-u)+principal*(FIM_GRAD[c.gradFim]||0.35)*u; }
+    if(c.composicao==='graduada'){ const u=Math.min(1,Math.abs(s)/Math.max(1,limite)), m0=mmDoPeso(principal), m1=mmDoPeso(fimCt), alvo=m0+(m1-m0)*u, cand=lista.filter(t=>t.ct<=principal*1.0001&&t.ct>=fimCt*.9999);
+      ct=ctFixo??(cand.length?cand:lista).reduce((a,b)=>Math.abs(mmDoPeso(b.ct)-alvo)<Math.abs(mmDoPeso(a.ct)-alvo)?b:a).ct; }
     if(c.composicao==='central'&&i===0){ ct=+c.centralCt; if(c.centralForma!=='igual') forma=c.centralForma; }
     if(c.composicao==='alternada'&&i%2) ct=principal*0.45;
     if(c.composicao==='intercalada'&&i%2){ forma=c.segunda; const larg=FORMAS[forma].dim[1]; ct=Math.min(principal*1.5,(dMax.W/larg)**3); }
     const d=medidas(forma,ct), ang=angulo(forma,i,lado), oc=ocupa(forma,d,ang);
-    return {forma,ct,d,ang,ao:oc.ao,fora:oc.fora,lado,i};
+    /* tres grifas: uma pedra aponta para cada lado, e as garras se encaixam */
+    return {forma,ct,d,ang:ang+(c.cravacao==='tres-grifas'&&i%2?180:0),ao:oc.ao,fora:oc.fora,lado,i};
   };
+  /* cada tamanho tem o espaco da tabela do modelo */
+  const folgaDe=e=>{ const l=linhaTabela(c.cravacao,Math.min(e.d.L,e.d.W)); return (l?l.folga:(FOLGA_CRAV[c.cravacao]??0.35))+(FOLGA_ESPACO[c.espaco]??0); };
   /* caminha do centro para um lado ate acabar o trecho; depois espelha */
   const caminhar=(extra)=>{
-    const lista=[]; let e=pedra(0,0,1); e.s=0;
-    if(e.ao/2>limite) return lista;
-    lista.push(e);
+    const fileira=[]; let e=pedra(0,0,1); e.s=0;
+    if(e.ao/2>limite) return fileira;
+    fileira.push(e);
     for(let i=1;i<4000;i++){
-      const ant=lista[lista.length-1], prox=pedra(i,ant.s+ant.ao,1);
-      const s=ant.s+(ant.ao+prox.ao)/2+(estacoes?passoEstacao:folga)+extra;
+      const ant=fileira[fileira.length-1], prox=pedra(i,ant.s+ant.ao,1);
+      const s=ant.s+(ant.ao+prox.ao)/2+(estacoes?passoEstacao:(folgaDe(ant)+folgaDe(prox))/2)+extra;
       if(s+prox.ao/2>limite) break;
-      prox.s=s; lista.push(prox);
+      prox.s=s; fileira.push(prox);
     }
-    return lista;
+    return fileira;
   };
   let lado=caminhar(0);
   if(c.extensao==='inteira'&&lado.length>1){   /* volta inteira: a sobra se reparte para fechar sem buraco */
     const ult=lado[lado.length-1], sobra=limite-(ult.s+ult.ao/2)-(c.peca==='anel'?folga/2:0);
     if(sobra>0) lado=caminhar(sobra/(lado.length-1));
   }
-  const espelho=lado.slice(1).map(e=>{ const m=pedra(e.i,-e.s,-1); m.s=-e.s; return m; }).reverse();
-  const fila=[...espelho,...lado];
+  const espelho=lado.slice(1).map(e=>{ const m=pedra(e.i,-e.s,-1,e.ct); m.s=-e.s; return m; }).reverse();
+  let fila=[...espelho,...lado];
+  /* peca padrao da tabela: a quantidade e a da tabela (pedras por cm x comprimento), distribuida por igual */
+  const padrao=!!linha&&linha.dentro&&formaP==='redondo'&&c.composicao==='uniforme'&&c.extensao==='inteira'&&c.espaco==='justo'&&+c.fileiras===1&&c.peca!=='anel';
+  const cm=cam.comp/10;
+  if(padrao){ const n=Math.max(1,Math.round(linha.pedrasPorCm*cm)), p=Math.max((P-2*fechoMeio)/n,Math.min(P/n,dMax.L+0.05));
+    fila=Array.from({length:n},(_,i)=>{ const s=(i-(n-1)/2)*p, e=pedra(i,s,s<0?-1:1); e.s=s; return e; }); }
 
   /* fileiras: a mesma sequencia, deslocada para fora e para dentro */
   const fileiras=(c.composicao==='central'||c.composicao==='intercalada'||estacoes)?1:+c.fileiras;
@@ -136,22 +172,26 @@ function montar(c){
   /* o que liga as pedras: encostadas = ligacao curta; longe = corrente */
   const ligacoes=[], correntes=[];
   for(let k=0;k<fila.length-1;k++){ const a=fila[k], b=fila[k+1], vao=(b.s-b.ao/2)-(a.s+a.ao/2);
-    if(vao>2.5) correntes.push({s0:a.s+a.ao/2,s1:b.s-b.ao/2,a,b}); else ligacoes.push({a,b}); }
+    if(vao>2.5&&(c.cravacao!=='coroa-faca'||estacoes)) correntes.push({s0:a.s+a.ao/2,s1:b.s-b.ao/2,a,b}); else ligacoes.push({a,b}); }
   if(c.peca!=='anel'&&fila.length){ const a=fila[fila.length-1], b=fila[0], ini=a.s+a.ao/2, fim=P+b.s-b.ao/2, m=fechoMeio;
     if(P/2-m-ini>0.5) correntes.push({s0:ini,s1:P/2-m,a,b:null});
     if(fim-(P/2+m)>0.5) correntes.push({s0:P/2+m,s1:fim,a:null,b}); }
 
   /* pingente, so no colar */
   let pingente=null;
-  if(c.peca==='colar'&&c.pingente!=='sem'&&fila.length){ const d=medidas(c.pingente,+c.pingenteCt), e=fila[espelho.length], l=FORMAS[c.pingente].gira?d.L:d.L;
+  if(c.peca==='colar'&&c.pingente!=='sem'&&fila.length){ const d=medidas(c.pingente,+c.pingenteCt), e=fila[Math.floor(fila.length/2)], l=FORMAS[c.pingente].gira?d.L:d.L;
     pingente={forma:c.pingente,ct:+c.pingenteCt,d,ang:90,dist:e.fora*(fileiras*0.5+(fileiras>1?0.2:0))+l/2+2}; }
 
   const cts=pedras.map(p=>p.ct);
-  const totalCt=cts.reduce((a,b)=>a+b,0)+(pingente?pingente.ct:0), n=pedras.length+(pingente?1:0);
+  const cont=new Map(); for(const e of pedras){ const k=e.ct.toFixed(4); cont.set(k,(cont.get(k)||0)+1); }
+  const listaTam=[...cont].map(([k,n])=>({ct:+k,n})).sort((a,b)=>b.ct-a.ct);
+  let gramas=padrao?linha.pesoPorCm*cm:null;
+  if(!padrao&&linha&&formaP==='redondo'&&c.composicao==='graduada'&&c.extensao==='inteira'&&c.peca!=='anel') gramas=fila.reduce((g,e)=>{ const l=linhaTabela(c.cravacao,e.d.L); return g+l.pesoPorCm/l.pedrasPorCm; },0);
+  const totalCt=(padrao?linha.pedrasPorCm*cm*principal:cts.reduce((a,b)=>a+b,0))+(pingente?pingente.ct:0), n=pedras.length+(pingente?1:0);
   const ini=fila.length?fila[0].s-fila[0].ao/2:0, fim=fila.length?fila[fila.length-1].s+fila[fila.length-1].ao/2:0;
   return {cam,pedras,fila,ligacoes,correntes,pingente,fileiras,estacoes,alturaAnel,pavMax,fechoMeio,folga,
-    stats:{n,totalCt,minCt:cts.length?Math.min(...cts):0,maxCt:cts.length?Math.max(...cts):0,trecho:fim-ini,comp:cam.comp}};
+    stats:{gramas,lista:listaTam,n,totalCt,minCt:cts.length?Math.min(...cts):0,maxCt:cts.length?Math.max(...cts):0,trecho:fim-ini,comp:cam.comp}};
 }
 
-return {FORMAS,medidas,contorno,caminho,montar};
+return {FORMAS,medidas,contorno,caminho,montar,mmDoPeso,pesoDoMm,linhaTabela,tamanhosDe};
 })();

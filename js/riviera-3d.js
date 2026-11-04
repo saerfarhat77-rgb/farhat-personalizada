@@ -99,6 +99,7 @@ function tubo3(pts3,raio,fechado){ return new THREE.TubeGeometry(new THREE.Catmu
 /* onde ficam as garras, em unidade da caixa da pedra */
 function alvosGarra(forma,crav){
   if(crav==='duas') return [[0,.5],[0,-.5]];
+  if(crav==='tres-grifas') return [[.5,0],[-.25,.433],[-.25,-.433]];
   if(crav==='cartier') return [[.5,.26],[.5,-.26],[-.5,.26],[-.5,-.26]];   /* duas a duas, viradas para a pedra vizinha */
   if(crav==='compartilhada') return [[.5,.27],[.5,-.27],[-.5,.27],[-.5,-.27]];
   if(crav==='seis') return [0,60,120,180,240,300].map(a=>[Math.cos(a*Math.PI/180)*.5,Math.sin(a*Math.PI/180)*.5]);
@@ -109,7 +110,7 @@ function alvosGarra(forma,crav){
 }
 
 /* cravacao de uma pedra: no mesmo sistema da pedra (y=0 na cintura) */
-function cabeca(forma,d,c,crav){
+function cabeca(forma,d,c,crav,folga=.5){
   const pts=R.contorno(forma).map(([x,z])=>[x*d.L,z*d.W]), partes=[];
   const W=Math.min(d.L,d.W), fundoY={baixa:-d.pav*.62,media:-d.pav*.86,alta:-d.pav*1.12}[c.altura]??-d.pav*.86;
   const rRail=Math.min(.32,Math.max(.1,.042*W)), esp={fina:.78,media:1,robusta:1.28}[c.espessuraGarra]??1;
@@ -122,10 +123,10 @@ function cabeca(forma,d,c,crav){
     const pular=crav==='semi-bezel'?(p=>Math.abs(p[0])>d.L*.24):null;
     partes.push(casca(pts,perfil,pular));
     if(crav==='semi-bezel'||!fechada) partes.push(trilho(pts,.74,fundoY*.72,rRail));
-  } else if(crav==='coroa'){
+  } else if(crav==='coroa'||crav==='coroa-faca'||crav==='xing'){
     /* coroa: colar de metal arredondado em volta da pedra, que sobe em quatro pontas e desce entre elas */
     const fino=[]; pts.forEach((p,i)=>{ const q=pts[(i+1)%pts.length]; for(let k=0;k<4;k++) fino.push([p[0]+(q[0]-p[0])*k/4,p[1]+(q[1]-p[1])*k/4]); });
-    const nr=normais(fino), rim=Math.min(.72,Math.max(.3,.115*W)), garras=alvosGarra(forma,crav).map(([ax,az])=>{ const qx=ax*d.L, qz=az*d.W; let m=1e9, b=pts[0]; for(const q of pts){ const e=Math.hypot(q[0]-qx,q[1]-qz); if(e<m){ m=e; b=q; } } return b; });
+    const nr=normais(fino), rim=crav==='coroa-faca'?Math.min(.5,Math.max(.25,.13*W)):Math.min(1,Math.max(.28,folga*.42)), garras=alvosGarra(forma,crav).map(([ax,az])=>{ const qx=ax*d.L, qz=az*d.W; let m=1e9, b=pts[0]; for(const q of pts){ const e=Math.hypot(q[0]-qx,q[1]-qz); if(e<m){ m=e; b=q; } } return b; });
     const angs=garras.map(([x,z])=>Math.atan2(z,x)), N=fino.length, pos=[], idx=[];
     const perfil=fechada?[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.55,.6,-.8],[.3,.05,-1]]:[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.6,.55,-.78],[.58,.1,-.8]];
     fino.forEach(([x,z],i)=>{ const a=Math.atan2(z,x); let u=0; for(const b of angs){ let e=Math.abs(a-b); if(e>Math.PI) e=2*Math.PI-e; u=Math.max(u,Math.exp(-((e/.4)**2))); }
@@ -204,7 +205,7 @@ function construir(c,M){
     juntar(pg.forma,pg.ct,['bezel','semi-bezel'].includes(c.cravacao)?'bezel':'quatro',mat); }
 
   for(const g of grupos.values()){
-    const d=R.medidas(g.forma,g.ref), gG=gema(g.forma,d), gC=cabeca(g.forma,d,c,g.cravacao);
+    const d=R.medidas(g.forma,g.ref), gG=gema(g.forma,d), gC=cabeca(g.forma,d,c,g.cravacao,M.folga);
     const mG=new THREE.InstancedMesh(gG,DIAMANTE,g.itens.length), mC=new THREE.InstancedMesh(gC,crav,g.itens.length);
     g.itens.forEach((it,i)=>{ const k=Math.cbrt(it.ct/g.ref); m4.copy(it.matriz).multiply(esc.makeScale(k,k,k)); mG.setMatrixAt(i,m4); mC.setMatrixAt(i,m4); });
     mG.computeBoundingSphere(); mC.computeBoundingSphere();
@@ -220,13 +221,14 @@ function construir(c,M){
   const yLiga=e=>anel?-e.d.pav*.62:elevar(e.d)-e.d.pav*.58;
   if(!anel) for(const l of M.ligacoes){ const sm=(l.a.s+l.b.s)/2, q=cam.at(sm), compr=l.b.s-l.a.s, y=(yLiga(l.a)+yLiga(l.b))/2;
     for(let r=0;r<M.fileiras;r++){ const off=(r-(M.fileiras-1)/2)*(l.a.fora+Math.max(.2,M.folga));
-      if(rigida) for(const de of [.34,-.34]) ligs.push({q,y,off:off+de*l.a.fora,compr,raio:rLiga*.75});
+      if(c.cravacao==='coroa-faca') ligs.push({q,y:y+.18,off,compr,raio:rLiga*1.5,faca:true});
+      else if(rigida) for(const de of [.34,-.34]) ligs.push({q,y,off:off+de*l.a.fora,compr,raio:rLiga*.75});
       else ligs.push({q,y,off,compr,raio:rLiga}); } }
   /* fileiras: uma barra atravessada amarra as pedras de cada coluna */
   const travessas=[];
   if(M.fileiras>1) for(const e of M.fila){ const q=cam.at(e.s), larg=(M.fileiras-1)*(e.fora+Math.max(.2,M.folga)); travessas.push({q,y:yLiga(e),larg,raio:rLiga*.8}); }
   if(ligs.length||travessas.length){ const im=new THREE.InstancedMesh(barra,corpo,ligs.length+travessas.length), a=new THREE.Matrix4(); let i=0;
-    for(const l of ligs){ const mt=quadroPonto(l.q,somar(l.q,l.y,l.off)); a.makeScale(l.compr/3,l.raio,l.raio); im.setMatrixAt(i++,mt.multiply(a)); }
+    for(const l of ligs){ const mt=quadroPonto(l.q,somar(l.q,l.y,l.off)); a.makeScale(l.compr/3,l.faca?l.raio*1.3:l.raio,l.faca?l.raio*.5:l.raio); im.setMatrixAt(i++,mt.multiply(a)); }
     for(const t of travessas){ const mt=quadroPonto(t.q,somar(t.q,t.y,0)); mt.multiply(rotY.clone().makeRotationY(Math.PI/2)); a.makeScale(t.larg/3,t.raio,t.raio); im.setMatrixAt(i++,mt.multiply(a)); }
     im.computeBoundingSphere(); modelo.add(im); }
   else barra.dispose();

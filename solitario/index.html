@@ -25,6 +25,20 @@
 .riviera .montar{grid-template-columns:minmax(0,1fr) minmax(320px,470px)}
 .riviera .palco{height:620px}
 .peso-ic{max-width:100%}
+.secao-pz .grupo+.grupo{margin-top:26px}
+.tamanhos-pz{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px!important}
+.tamanhos-pz label{display:grid;gap:6px;font-size:12px;color:var(--texto-2)}
+.tamanhos-pz [hidden]{display:none}
+.sel{font:inherit;font-size:15px;padding:12px 14px;border:1px solid var(--linha);background:var(--branco);color:var(--preto);width:100%;border-radius:0}
+.sel:focus{outline:1px solid var(--preto);border-color:var(--preto)}
+.lista-tam{margin-top:22px}
+.lista-tam table{width:100%;border-collapse:collapse;font-size:14px}
+.lista-tam caption{text-align:left;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-stretch:110%;color:var(--texto-2);padding-bottom:10px}
+.lista-tam th{text-align:left;font-weight:400;font-size:12px;color:var(--cinza);padding:0 0 8px;border-bottom:1px solid var(--linha-forte)}
+.lista-tam td{padding:8px 0;border-bottom:1px solid var(--linha)}
+.lista-tam th:last-child,.lista-tam td:last-child{text-align:right}
+.lista-tam tfoot td{color:var(--preto);font-weight:400;border-bottom:0;border-top:1px solid var(--linha-forte)}
+.nota-forma{font-size:13px;color:var(--cinza);margin-top:14px;max-width:52ch}
 .escolhas.pedra{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));align-items:end}
 .escolhas.pedra button{align-content:end}
 @media (max-width:900px){
