@@ -25,8 +25,8 @@ cena.environmentIntensity=1.1;
   const b=new THREE.DirectionalLight(0xfff3e6,1.1); b.position.set(-45,25,-15); cena.add(b);
   cena.add(new THREE.HemisphereLight(0xffffff,0xd8d4cc,0.8)); }
 
-const metalBase=c=>new THREE.MeshPhysicalMaterial({color:c,metalness:1,roughness:.14,envMapIntensity:2.1,clearcoat:.5,clearcoatRoughness:.08,side:THREE.DoubleSide});
-const OURO={branco:metalBase(0xf1f1ef),amarelo:metalBase(0xf7c977),rose:metalBase(0xf2b9a3)};
+const metalBase=c=>new THREE.MeshPhysicalMaterial({color:c,metalness:1,roughness:.2,envMapIntensity:1.05,clearcoat:.25,clearcoatRoughness:.12,side:THREE.DoubleSide});
+const OURO={branco:metalBase(0xc4c5c8),amarelo:metalBase(0xe0ab55),rose:metalBase(0xdc9c86)};
 const estudioPedra=(()=>{ const c=new THREE.Scene(); c.background=new THREE.Color(0xb9bcc4);
   const luz=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide}), meia=new THREE.MeshBasicMaterial({color:0x6d7079,side:THREE.DoubleSide}), preto=new THREE.MeshBasicMaterial({color:0x17181c,side:THREE.DoubleSide});
   for(let i=0;i<36;i++){ const a=i/36*Math.PI*2, tipo=i%4, f=new THREE.Mesh(new THREE.PlaneGeometry(tipo===3?.55:1.3,4+((i*7)%6)),tipo===3?preto:tipo===1?meia:luz);
@@ -37,6 +37,7 @@ const DIAMANTE=new THREE.MeshPhysicalMaterial({color:0xffffff,metalness:1,roughn
   iridescence:.3,iridescenceIOR:1.9,side:THREE.DoubleSide});
 
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const POL_TESTE=window.__POL??null;   /* so para conferir a cravacao de lado, nos testes */
 
 /* ---------- pedra: camadas do contorno, da mesa ate o fundo; cada triangulo e uma faceta ---------- */
 function gema(forma,d){
@@ -96,11 +97,30 @@ function taca(pts,camadas){
 const trilho=(pts,f,y,raio)=>tubo3(pts.map(([x,z])=>V(x*f,y,z*f)),raio,true);
 function tubo3(pts3,raio,fechado){ return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts3,fechado,'catmullrom',0.15),Math.max(pts3.length*2,16),raio,6,fechado); }
 
+/* parede reta com espessura, seguindo o contorno; topo(p) da a altura da borda em cada ponto; janela(p) abre o vao entre yJ0 e yJ1 */
+function paredeReta(pts,nr,t,yB,topo,janela,yJ0,yJ1){
+  const n=pts.length, pos=[], nor=[];
+  const P=(i,lado,y)=>{ const o=t*lado-Math.max(0,y)*.3; return [pts[i][0]+nr[i][0]*o,y,pts[i][1]+nr[i][1]*o]; };   /* acima da cintura a parede inclina para dentro, abracando a pedra */
+  const quad=(a,b,c,d,na,nb)=>{ nb=nb||na; pos.push(...a,...b,...c,...a,...c,...d); nor.push(...na,...nb,...nb,...na,...nb,...na); };
+  for(let i=0;i<n;i++){ const k=(i+1)%n, ti=topo(pts[i]), tk=topo(pts[k]), ji=janela(pts[i])&&janela(pts[k]);
+    const no=i=>[nr[i][0],0,nr[i][1]], ni=i=>[-nr[i][0],0,-nr[i][1]];
+    for(const [lado,nn] of [[1,no],[0,ni]]){
+      const faixas=ji?[[yB,yJ0],[yJ1,null]]:[[yB,null]];
+      for(const [y0,y1] of faixas){ const a=P(i,lado,y0), b=P(k,lado,y0), c=P(k,lado,y1??tk), d=P(i,lado,y1??ti);
+        if(lado) quad(a,b,c,d,nn(i),nn(k)); else quad(b,a,d,c,nn(k),nn(i)); } }
+    quad(P(i,1,ti),P(k,1,tk),P(k,0,tk),P(i,0,ti),[0,1,0]);
+    quad(P(i,0,yB),P(k,0,yB),P(k,1,yB),P(i,1,yB),[0,-1,0]);
+    if(ji){ quad(P(i,0,yJ0),P(k,0,yJ0),P(k,1,yJ0),P(i,1,yJ0),[0,1,0]); quad(P(i,1,yJ1),P(k,1,yJ1),P(k,0,yJ1),P(i,0,yJ1),[0,-1,0]); }
+    const jp=janela(pts[(i-1+n)%n])&&janela(pts[i]);
+    if(ji!==jp){ const tx=pts[k][0]-pts[i][0], tz=pts[k][1]-pts[i][1], m=Math.hypot(tx,tz)||1, s=ji?1:-1, nt=[tx/m*s,0,tz/m*s];
+      quad(P(i,1,yJ0),P(i,0,yJ0),P(i,0,yJ1),P(i,1,yJ1),nt); } }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); return g;
+}
+
 /* onde ficam as garras, em unidade da caixa da pedra */
 function alvosGarra(forma,crav){
   if(crav==='duas') return [[0,.5],[0,-.5]];
-  if(crav==='tres-grifas') return [[.5,0],[-.25,.433],[-.25,-.433]];
-  if(crav==='cartier') return [[.5,.26],[.5,-.26],[-.5,.26],[-.5,-.26]];   /* duas a duas, viradas para a pedra vizinha */
+  if(crav==='tres-grifas') return [[0,.5],[.43,-.25],[-.43,-.25]];   /* uma garra para fora e duas nas juncoes do lado de dentro */
   if(crav==='compartilhada') return [[.5,.27],[.5,-.27],[-.5,.27],[-.5,-.27]];
   if(crav==='seis') return [0,60,120,180,240,300].map(a=>[Math.cos(a*Math.PI/180)*.5,Math.sin(a*Math.PI/180)*.5]);
   if(forma==='gota') return [[.5,0],[-.32,.46],[-.32,-.46],[-.5,0]];
@@ -123,18 +143,35 @@ function cabeca(forma,d,c,crav,folga=.5){
     const pular=crav==='semi-bezel'?(p=>Math.abs(p[0])>d.L*.24):null;
     partes.push(casca(pts,perfil,pular));
     if(crav==='semi-bezel'||!fechada) partes.push(trilho(pts,.74,fundoY*.72,rRail));
-  } else if(crav==='coroa'||crav==='coroa-faca'||crav==='xing'){
-    /* coroa: colar de metal arredondado em volta da pedra, que sobe em quatro pontas e desce entre elas */
-    const fino=[]; pts.forEach((p,i)=>{ const q=pts[(i+1)%pts.length]; for(let k=0;k<4;k++) fino.push([p[0]+(q[0]-p[0])*k/4,p[1]+(q[1]-p[1])*k/4]); });
-    const nr=normais(fino), rim=crav==='coroa-faca'?Math.min(.5,Math.max(.25,.13*W)):Math.min(1,Math.max(.28,folga*.42)), garras=alvosGarra(forma,crav).map(([ax,az])=>{ const qx=ax*d.L, qz=az*d.W; let m=1e9, b=pts[0]; for(const q of pts){ const e=Math.hypot(q[0]-qx,q[1]-qz); if(e<m){ m=e; b=q; } } return b; });
-    const angs=garras.map(([x,z])=>Math.atan2(z,x)), N=fino.length, pos=[], idx=[];
-    const perfil=fechada?[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.55,.6,-.8],[.3,.05,-1]]:[[1,-.02*W,0],[1,.55,.04],[1,.92,-.1],[1,1,-.32],[.86,.85,-.55],[.6,.55,-.78],[.58,.1,-.8]];
-    fino.forEach(([x,z],i)=>{ const a=Math.atan2(z,x); let u=0; for(const b of angs){ let e=Math.abs(a-b); if(e>Math.PI) e=2*Math.PI-e; u=Math.max(u,Math.exp(-((e/.4)**2))); }
-      const topo=-d.pav*.2+(d.coroa*.26+d.pav*.2)*u;
-      perfil.forEach(([f,o,yr],j)=>{ const of=j===0?o:o*rim, y=j<3?topo+yr*W*.4:Math.min(topo-.1*W,d.pav*yr); pos.push(x*f+nr[i][0]*of,y,z*f+nr[i][1]*of); }); });
-    const M=perfil.length; for(let i=0;i<N;i++){ const k=(i+1)%N; for(let j=0;j<M-1;j++){ const a=i*M+j, b=k*M+j, c2=k*M+j+1, e=i*M+j+1; idx.push(a,b,e,b,c2,e); } }
-    const gc=new THREE.BufferGeometry(); gc.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); gc.setIndex(idx); gc.computeVertexNormals(); partes.push(gc);
-    for(const [px,pz] of garras){ const r=Math.hypot(px,pz)||1, ux=px/r, uz=pz/r; partes.push(bolaEm(V(px+ux*rim*.08,d.coroa*.44,pz+uz*rim*.08),haste*1.3)); }
+  } else if(crav==='coroa'||crav==='xing'||crav==='coroa-faca'){
+    /* coroa: tubo de parede reta em volta da pedra, com janela dos lados; a borda de cima sobe em quatro pontas de coroa,
+       e quatro garras retas, com bolinha na ponta, sobem nos vales entre as pontas */
+    const t=Math.min(.4,Math.max(.15,.07*W)), yB=-d.pav*.82, yJ0=-d.pav*.6, yJ1=-d.pav*.3, yV=-d.pav*.22, yP=d.coroa*.72;
+    let fino=[]; pts.forEach((p,i)=>{ const q=pts[(i+1)%pts.length]; for(let k=0;k<4;k++) fino.push([p[0]+(q[0]-p[0])*k/4,p[1]+(q[1]-p[1])*k/4]); });
+    if(forma==='redondo'||forma==='oval'){ const rx=Math.max(...pts.map(p=>Math.abs(p[0]))), rz=Math.max(...pts.map(p=>Math.abs(p[1]))); fino=[...Array(96)].map((_,i)=>[Math.cos(i/96*Math.PI*2)*rx,Math.sin(i/96*Math.PI*2)*rz]); }   /* tubo liso, sem quinas */
+    const nr=normais(fino), folgaP=.02*W, ins=fino.map(([x,z],i)=>[x+nr[i][0]*folgaP,z+nr[i][1]*folgaP]);
+    const topo=([x,z])=>{ const a=((Math.atan2(z,x)*180/Math.PI)%90+90)%90, dd=Math.min(a,90-a)/45; return yV+(yP-yV)*Math.pow(1-dd,1.5); };
+    const janela=([x,z])=>{ const a=Math.abs(Math.atan2(z,x)*180/Math.PI); return Math.abs(a-90)<26; };
+    partes.push(paredeReta(ins,nr,t,yB,topo,janela,yJ0,yJ1));
+    /* aro de baixo, um pouco mais largo */
+    partes.push(trilho(ins,1+(t*.9)/(W/2),yB+rRail*.6,rRail*1.05));
+    /* garras retas nos vales */
+    const N=ins.length;
+    for(const ang of [45,135,225,315]){ let k=0,m=1e9; ins.forEach(([x,z],i)=>{ let e=Math.abs(Math.atan2(z,x)*180/Math.PI-(ang>180?ang-360:ang)); if(e<m){ m=e; k=i; } });
+      const [x,z]=ins[k], ox=x+nr[k][0]*t*.5, oz=z+nr[k][1]*t*.5, topoG=d.coroa*.4;
+      const h=new THREE.CylinderGeometry(haste*.78,haste*.86,topoG-yB,10); h.translate(ox,(topoG+yB)/2,oz); partes.push(h);
+      partes.push(bolaEm(V(ox-nr[k][0]*haste*.45,topoG,oz-nr[k][1]*haste*.45),haste*1.05,12,9)); }
+  } else if(crav==='cartier'){
+    /* caixa quadrada por pedra: garra reta em cada canto, aro quadrado em cima e embaixo, lados abertos.
+       A pedra passa um pouco da caixa nos lados, como na pulseira de tenis */
+    const ax=d.L/2*.76+haste*.3, az=d.W/2*.76+haste*.3, yA=-d.pav*.42, yB=-d.pav*.86, rr=Math.max(.09,haste*.55);
+    for(const y of [yA,yB]){ const k=1;
+      for(const [sx,sz,lx,lz] of [[1,0,0,2*az*k],[-1,0,0,2*az*k],[0,1,2*ax*k,0],[0,-1,2*ax*k,0]]){
+        const b=new THREE.BoxGeometry(lx||rr*1.6,rr*1.6,lz||rr*1.6); b.translate(sx*ax*k,y,sz*az*k); partes.push(b); } }
+    const topoG=d.coroa*.38;
+    for(const sx of [1,-1]) for(const sz of [1,-1]){
+      const h=new THREE.CylinderGeometry(haste*.8,haste*.88,topoG-yB,10); h.translate(sx*ax,(topoG+yB)/2,sz*az); partes.push(h);
+      partes.push(bolaEm(V(sx*(ax-haste*.35),topoG,sz*(az-haste*.35)),haste*1.05,12,9)); }
   } else if(crav==='canaleta'){
     partes.push(trilho(pts,.72,fundoY*.72,rRail));
   } else {
@@ -143,16 +180,18 @@ function cabeca(forma,d,c,crav,folga=.5){
       const qx=ax*d.L, qz=az*d.W; let px=qx, pz=qz;
       if(crav!=='compartilhada'){ let m=1e9; for(const [x,z] of pts){ const e=Math.hypot(x-qx,z-qz); if(e<m){ m=e; px=x; pz=z; } } }
       const r=Math.hypot(px,pz)||1, ux=px/r, uz=pz/r;
-      const curva=new THREE.CatmullRomCurve3([V(px*.46,fundoY,pz*.46),V(px*.74,-d.pav*.42,pz*.74),V(px+ux*haste*.5,-.02*W,pz+uz*haste*.5),V(px+ux*haste*.25,d.coroa*.42,pz+uz*haste*.25)],false,'centripetal');
-      partes.push(tuboAfinado(curva,haste*1.02,haste*.86));
+      /* garra reta: sobe em pe, encostada na cintura da pedra */
+      const gx=px+ux*haste*.55, gz=pz+uz*haste*.55, gTopo=d.coroa*.42, gBase=fundoY*.9;
+      { const h=new THREE.CylinderGeometry(haste*.86,haste*.98,gTopo-gBase,10); h.translate(gx,(gTopo+gBase)/2,gz); partes.push(h); }
+      if(crav==='tres-grifas'&&az>.3){ const cn=new THREE.ConeGeometry(haste*1.5,haste*2,10); cn.translate(0,haste,0); const dirV=V(ux,-.1,uz).normalize(); cn.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,1,0),dirV)); cn.translate(px,d.coroa*.1,pz); partes.push(cn); partes.push(bolaEm(V(px+dirV.x*haste*1.45,d.coroa*.1+dirV.y*haste*1.45,pz+dirV.z*haste*1.45),haste*.78,10,8)); }
       const tp=V(px+ux*haste*.08,d.coroa*.5,pz+uz*haste*.08), entra=V(-ux,.34,-uz).normalize(), tipo=c.ponta;
       if(tipo==='unha-gato'||tipo==='em-v'){ const cn=new THREE.ConeGeometry(ponta*(tipo==='em-v'?1.5:1.15),haste*3.4,tipo==='em-v'?4:10); cn.translate(0,haste*1.5,0);
         cn.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,1,0),entra)); cn.translate(tp.x,tp.y,tp.z); partes.push(cn); partes.push(bolaEm(tp,ponta)); }
       else if(tipo==='quadrada'){ const b=new THREE.BoxGeometry(ponta*2.3,ponta*1.5,ponta*2.3); b.rotateY(-Math.atan2(uz,ux)); b.translate(tp.x,tp.y,tp.z); partes.push(b); }
       else partes.push(bolaEm(tp,ponta*1.2));
     }
-    partes.push(trilho(pts,.72,-d.pav*.42,rRail));
-    if(!fechada) partes.push(trilho(pts,.42,fundoY*.98,rRail*.9));
+    partes.push(trilho(pts,.8,-d.pav*.42,rRail));
+    if(!fechada) partes.push(trilho(pts,.8,fundoY*.9,rRail*.9));
   }
   if(fechada) partes.push(taca(pts,[[.92,-d.pav*.1],[.72,-d.pav*.5],[.42,fundoY*.95],[.02,fundoY*1.02]]));
   if(c.acabamento==='milgrain'){ const q=Math.min(26,Math.max(12,Math.floor(2*(d.L+d.W)/.42))), nr=normais(pts), n=pts.length;
@@ -187,7 +226,7 @@ const somar=(q,du,dz)=>V(q.p[0]+q.U[0]*du+q.Z[0]*dz,q.p[1]+q.U[1]*du+q.Z[1]*dz,q
 function construir(c,M){
   if(modelo){ cena.remove(modelo); modelo.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.isInstancedMesh) o.dispose(); }); }
   modelo=new THREE.Group();
-  const acab={polido:.14,acetinado:.34,fosco:.5,milgrain:.14}[c.acabamento]??.14;
+  const acab={polido:.2,acetinado:.36,fosco:.5,milgrain:.2}[c.acabamento]??.2;
   const corpo=OURO[c.ouro].clone(); corpo.roughness=acab;
   const crav=(c.ouro!=='branco'&&c.ouroCrav==='branco'?OURO.branco:OURO[c.ouro]).clone(); crav.roughness=acab;
   const cam=M.cam, anel=cam.tipo==='anel'; ehAnel=anel;
@@ -221,8 +260,8 @@ function construir(c,M){
   const yLiga=e=>anel?-e.d.pav*.62:elevar(e.d)-e.d.pav*.58;
   if(!anel) for(const l of M.ligacoes){ const sm=(l.a.s+l.b.s)/2, q=cam.at(sm), compr=l.b.s-l.a.s, y=(yLiga(l.a)+yLiga(l.b))/2;
     for(let r=0;r<M.fileiras;r++){ const off=(r-(M.fileiras-1)/2)*(l.a.fora+Math.max(.2,M.folga));
-      if(c.cravacao==='coroa-faca') ligs.push({q,y:y+.18,off,compr,raio:rLiga*1.5,faca:true});
-      else if(rigida) for(const de of [.34,-.34]) ligs.push({q,y,off:off+de*l.a.fora,compr,raio:rLiga*.75});
+      if(c.cravacao==='coroa-faca') continue;
+      if(rigida) for(const de of [.34,-.34]) ligs.push({q,y,off:off+de*l.a.fora,compr,raio:rLiga*.75});
       else ligs.push({q,y,off,compr,raio:rLiga}); } }
   /* fileiras: uma barra atravessada amarra as pedras de cada coluna */
   const travessas=[];
@@ -232,6 +271,14 @@ function construir(c,M){
     for(const t of travessas){ const mt=quadroPonto(t.q,somar(t.q,t.y,0)); mt.multiply(rotY.clone().makeRotationY(Math.PI/2)); a.makeScale(t.larg/3,t.raio,t.raio); im.setMatrixAt(i++,mt.multiply(a)); }
     im.computeBoundingSphere(); modelo.add(im); }
   else barra.dispose();
+
+  if(c.cravacao==='coroa-faca'&&!anel&&M.ligacoes.length){
+    const g=new THREE.BoxGeometry(1,1,1);   /* faca: barra reta de secao retangular, em pe */
+    const im=new THREE.InstancedMesh(g,corpo,M.ligacoes.length), A=new THREE.Vector3(), B=new THREE.Vector3(), X=new THREE.Vector3(), Zv=new THREE.Vector3(), m=new THREE.Matrix4(), s=new THREE.Matrix4();
+    M.ligacoes.forEach((l,i)=>{ const qa=cam.at(l.a.s), qb=cam.at(l.b.s), ya=elevar(l.a.d)-l.a.d.pav*.62, yb=elevar(l.b.d)-l.b.d.pav*.62; A.copy(somar(qa,ya,0)); B.copy(somar(qb,yb,0));
+      X.subVectors(B,A); const dist=X.length(); X.normalize(); const U=V(...qa.U); Zv.crossVectors(X,U).normalize(); const lg=Math.min(.5,Math.max(.2,.1*l.a.d.L));
+      m.makeBasis(X,U,Zv); m.setPosition(A.clone().add(B).multiplyScalar(.5)); s.makeScale(Math.max(.5,dist-l.a.ao*.8),lg*1.9,lg); im.setMatrixAt(i,m.clone().multiply(s)); });
+    im.computeBoundingSphere(); modelo.add(im); }
 
   /* canaleta: dois trilhos que acompanham a peca */
   if(c.cravacao==='canaleta'){ const box=new THREE.BoxGeometry(1,1,1), n=M.pedras.length, im=new THREE.InstancedMesh(box,crav,n*2), a=new THREE.Matrix4(); let i=0;
@@ -288,7 +335,7 @@ function construir(c,M){
   desenharSombra(M,caixa);
   const e0=M.fila[Math.floor(M.fila.length/2)];
   if(e0){ const q=cam.at(e0.s); focoDetalhe.copy(somar(q,elevar(e0.d),ping?ping.dist*.45:0)); } else focoDetalhe.copy(centro);
-  larguraDetalhe=Math.max(21,e0?e0.fora*M.fileiras*2.2:21,ping?ping.dist*2.4:0);
+  larguraDetalhe=Math.max(13,e0?e0.fora*M.fileiras*3.2:13,ping?ping.dist*2.4:0);
   controles.target.copy(centro);
   reenquadrar();
   pedirQuadro();
@@ -319,7 +366,7 @@ function reenquadrar(){
   posicionar(az,pol);
 }
 function posicionarDetalhe(){
-  const az=Math.atan2(camera.position.x-controles.target.x,camera.position.z-controles.target.z), pol=ehAnel?.9:.72;
+  const az=Math.atan2(camera.position.x-controles.target.x,camera.position.z-controles.target.z), pol=POL_TESTE??(ehAnel?.9:.42);
   const a=camDetalhe.aspect||1, tan=Math.tan(13*Math.PI/180), d=(larguraDetalhe/2)/(tan*Math.min(1,a));  /* distancia fixa: pedra pequena aparece pequena */
   camDetalhe.position.set(focoDetalhe.x+d*Math.sin(pol)*Math.sin(az),focoDetalhe.y+d*Math.cos(pol),focoDetalhe.z+d*Math.sin(pol)*Math.cos(az)); camDetalhe.lookAt(focoDetalhe);
   camDetalhe.near=Math.max(1,d*.2); camDetalhe.far=d*4; camDetalhe.updateProjectionMatrix();

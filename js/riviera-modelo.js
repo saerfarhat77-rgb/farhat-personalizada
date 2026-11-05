@@ -133,8 +133,7 @@ function montar(c){
     if(c.composicao==='alternada'&&i%2) ct=principal*0.45;
     if(c.composicao==='intercalada'&&i%2){ forma=c.segunda; const larg=FORMAS[forma].dim[1]; ct=Math.min(principal*1.5,(dMax.W/larg)**3); }
     const d=medidas(forma,ct), ang=angulo(forma,i,lado), oc=ocupa(forma,d,ang);
-    /* tres grifas: uma pedra aponta para cada lado, e as garras se encaixam */
-    return {forma,ct,d,ang:ang+(c.cravacao==='tres-grifas'&&i%2?180:0),ao:oc.ao,fora:oc.fora,lado,i};
+    return {forma,ct,d,ang,ao:oc.ao,fora:oc.fora,lado,i};
   };
   /* cada tamanho tem o espaco da tabela do modelo */
   const folgaDe=e=>{ const l=linhaTabela(c.cravacao,Math.min(e.d.L,e.d.W)); return (l?l.folga:(FOLGA_CRAV[c.cravacao]??0.35))+(FOLGA_ESPACO[c.espaco]??0); };
